@@ -40,19 +40,20 @@ public class MutualExclusion {
 
     public synchronized void acquireLock() {
         // Ensure only one process can acquire the lock at a time
-        while (CS_BUSY) {
-            try {
-                wait(); // Wait if the critical section is already occupied
-            } catch (InterruptedException e) {
-                Thread.currentThread().interrupt();
-            }
-        }
+        //while (CS_BUSY) {
+          //  try {
+            //    wait(); // Wait if the critical section is already occupied
+            //} catch (InterruptedException e) {
+             //   Thread.currentThread().interrupt();
+           // }
+        //}
         CS_BUSY = true;
     }
 
     public synchronized void releaseLocks() {
         CS_BUSY = false;
-        notifyAll(); // Notify all waiting threads that the critical section is now free
+        WANTS_TO_ENTER_CS = false;
+        //notifyAll(); // Notify all waiting threads that the critical section is now free
     }
 
     public boolean doMutexRequest(Message message, byte[] updates) throws RemoteException {
@@ -87,7 +88,7 @@ public class MutualExclusion {
             mutexqueue.clear();
 
             // Release the lock after completing the critical section operation
-            releaseLocks();
+            //releaseLocks();
 
             // Return true indicating the process acquired the lock
             return true;
@@ -113,7 +114,8 @@ public class MutualExclusion {
 	
 		// If the message is from the same node, acknowledge and call onMutexAcknowledgementReceived()
 		if (message.getNodeName().equals(node.getNodeName())) {
-			onMutexAcknowledgementReceived(message);
+            message.setAcknowledged(true);
+			node.onMutexAcknowledgementReceived(message);
 			return;
 		}
 	
@@ -150,6 +152,7 @@ public class MutualExclusion {
         switch (condition) {
             case 0:  // Case 0: Receiver is not accessing the shared resource and doesn't want to
                 // Acknowledge the message and respond with permission (OK)
+                
                 if (stub != null) {
                     stub.onMutexAcknowledgementReceived(message);
                 }
@@ -162,8 +165,8 @@ public class MutualExclusion {
 
             case 2:  // Case 2: Receiver wants to access the resource but is not yet in the critical section
                 // Compare the clocks of the message and the receiver to determine which one should proceed
-                if (message.getClock() < clock.getClock() || 
-                    (message.getClock() == clock.getClock() && message.getNodeID().compareTo(node.getNodeID()) < 0)) {
+                if (message.getClock() < node.getMessage().getClock() || 
+                    (message.getClock() == node.getMessage().getClock() && message.getNodeID().compareTo(node.getNodeID()) < 0)) {
                     // If the message has a lower clock or the same clock with a lower node ID, grant permission
                     if (stub != null) {
                         stub.onMutexAcknowledgementReceived(message);
